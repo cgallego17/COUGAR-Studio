@@ -24,6 +24,7 @@ from studio_updates import check_latest, download_update
 from display_protocol import HidWriter, LOGO_BIT, numeric_packet, missing_temperature_packet, load
 from segment_scenes import DIGIT_LAYOUT, INTERNET_SCENES, CIRCULAR_SCENES, SCENE_LABELS, scene_packet, read_masks
 from preview_personalization import SEGMENTS
+from gif_segments import load_gif
 
 ROOT = Path(sys.executable).parent if getattr(sys, 'frozen', False) else SOURCE
 ASSETS = Path(sys._MEIPASS) if getattr(sys, 'frozen', False) else SOURCE / 'assets'
@@ -31,7 +32,7 @@ DATA = Path(os.environ.get('COUGAR_STUDIO_DATA_DIR') or str(Path(os.environ.get(
 BG, CARD, INK, MUTED, ACCENT = '#10141b', '#1c2430', '#f4f6fa', '#a4b2c5', '#ff9652'
 
 
-def run(preview=False, smoke=False, screenshot=None, initial='sensors'):
+def run(preview=False, smoke=False, screenshot=None, initial='sensors', gif_demo=False):
     if sys.platform == 'win32':
         c.windll.shell32.SetCurrentProcessExplicitAppUserModelID('cgallego17.COUGARStudio')
     root = tk.Tk()
@@ -73,13 +74,15 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors'):
         profile, profile_error = Profile(), str(exc)
     stop, commands, events = threading.Event(), queue.Queue(), queue.Queue()
     ui = {'profile': profile, 'log': [], 'values': [None]*6, 'closing': False,
-          'last_packet': None, 'usb': 'Simulación' if preview else 'Conectando…'}
+          'last_packet': None, 'usb': 'Simulación' if preview else 'Conectando…', 'gif': None, 'gif_path': None}
     style = ttk.Style(root)
     style.theme_use('clam')
     style.configure('TNotebook', background=BG, borderwidth=0)
     style.configure('TNotebook.Tab', background=CARD, foreground=MUTED, padding=(16, 10), font=('Segoe UI', 10))
     style.map('TNotebook.Tab', background=[('selected', '#344257')], foreground=[('selected', INK)])
     style.configure('TCombobox', fieldbackground=CARD, foreground=INK, background=CARD)
+    style.map('TCombobox', fieldbackground=[('readonly', CARD)], foreground=[('readonly', INK)],
+              selectbackground=[('readonly', CARD)], selectforeground=[('readonly', INK)])
 
     def label(parent, text='', size=11, color=INK, **kw):
         return tk.Label(parent, text=text, bg=parent.cget('bg'), fg=color, font=('Segoe UI', size), **kw)
@@ -137,8 +140,8 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors'):
         sensor_labels.append(value)
     tabs = ttk.Notebook(right)
     tabs.pack(fill='both', expand=True)
-    designs, cycle, settings, diagnosis, updates = [tk.Frame(tabs, bg=BG, padx=14, pady=14) for _ in range(5)]
-    for pane, title in [(designs, 'Diseños'), (cycle, 'Mi ciclo'), (settings, 'Ajustes'), (diagnosis, 'Diagnóstico'), (updates, 'Actualizar')]:
+    designs, gif_tab, cycle, settings, diagnosis, updates = [tk.Frame(tabs, bg=BG, padx=14, pady=14) for _ in range(6)]
+    for pane, title in [(designs, 'Diseños'), (gif_tab, 'GIF'), (cycle, 'Mi ciclo'), (settings, 'Ajustes'), (diagnosis, 'Diagnóstico'), (updates, 'Actualizar')]:
         tabs.add(pane, text=title)
     label(designs, '23 diseños para tu pantalla', 17).pack(anchor='w')
     label(designs, 'Elige un efecto. Al terminar volverá a los datos de CPU.', 10, MUTED, wraplength=510).pack(anchor='w', pady=(6, 12))
@@ -165,6 +168,100 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors'):
     quick.pack(fill='x')
     for caption, mode in [('CPU', 'sensors'), ('GPU', 'gpu'), ('Apagar', 'blank'), ('SoulKilleR', 'name')]:
         button(quick, caption, lambda mode=mode: select(mode)).pack(side='left', padx=(0, 7))
+    label(gif_tab, 'GIF sobre los segmentos', 17).pack(anchor='w')
+    label(gif_tab, 'Como luces de un teclado: el brillo del GIF enciende las barras cercanas.\n'
+          'Prueba siluetas claras sobre fondo negro; los detalles pequeños se pierden.',
+          10, MUTED, justify='left', wraplength=570).pack(anchor='w', pady=(6, 10))
+    gif_status = label(gif_tab, 'Importa un GIF o carga la demostración incluida.', 10, MUTED,
+                       wraplength=560, justify='left')
+    gif_status.pack(anchor='w', pady=6)
+    gif_thumbnail = label(gif_tab, 'El original aparecerá aquí', 10, MUTED)
+    gif_thumbnail.pack(anchor='w', pady=5)
+    gif_threshold = tk.IntVar(value=64)
+    gif_invert = tk.BooleanVar(value=False)
+    gif_region = tk.StringVar(value='Dígitos')
+    gif_fit = tk.StringVar(value='Ajustar completo')
+    gif_seconds = tk.StringVar(value='12')
+    gif_busy = {'value': False}
+
+    def convert_gif(path=None, autoplay=None):
+        if gif_busy['value']:
+            return
+        if path is None:
+            path = filedialog.askopenfilename(parent=root, title='Importar GIF', filetypes=[('GIF animado', '*.gif')])
+        if not path:
+            return
+        try:
+            options = dict(threshold=gif_threshold.get(), invert=gif_invert.get(),
+                           region='digits' if gif_region.get() == 'Dígitos' else 'circle',
+                           fit='contain' if gif_fit.get() == 'Ajustar completo' else 'cover')
+            if not 1 <= options['threshold'] <= 254:
+                raise ValueError('Usa un umbral entre 1 y 254.')
+        except (ValueError, tk.TclError) as exc:
+            messagebox.showerror('Revisa los ajustes del GIF', str(exc), parent=root)
+            return
+        gif_busy['value'] = True
+        gif_status.configure(text='Convirtiendo cuadros a segmentos…')
+        for control in gif_controls:
+            control.configure(state='disabled')
+        def task():
+            try:
+                animation = load_gif(path, **options)
+                events.put(('gif_loaded', animation, str(path), autoplay))
+            except Exception as exc:
+                events.put(('gif_error', str(exc)))
+        threading.Thread(target=task, daemon=True).start()
+
+    def play_gif(live=False):
+        if not ui['gif'] or gif_busy['value']:
+            return
+        try:
+            seconds = float(gif_seconds.get().replace(',', '.'))
+            if not 2 <= seconds <= 60:
+                raise ValueError('Usa una duración entre 2 y 60 segundos.')
+        except ValueError as exc:
+            messagebox.showerror('Duración del GIF', str(exc), parent=root)
+            return
+        commands.put(('gif', (ui['gif'], seconds, live)))
+        tabs.select(gif_tab)
+        gif_status.configure(text=('Vista previa local' if preview else ('Mostrando en el dispositivo' if live else 'Solo vista previa; el dispositivo sigue mostrando CPU'))+
+                             f' · {seconds:g} s; después vuelve a CPU.')
+
+    row = tk.Frame(gif_tab, bg=BG)
+    row.pack(fill='x', pady=8)
+    gif_import = button(row, 'Importar GIF…', convert_gif, True)
+    gif_import.pack(side='left')
+    gif_demo_button = button(row, 'Cargar demo', lambda: convert_gif(ASSETS/'demo-segmentos.gif'))
+    gif_demo_button.pack(side='left', padx=8)
+    row = tk.Frame(gif_tab, bg=BG)
+    row.pack(fill='x', pady=5)
+    label(row, 'Umbral de luz (menor = más barras)', 10).pack(side='left', padx=(0, 10))
+    ttk.Spinbox(row, from_=1, to=254, textvariable=gif_threshold, width=6).pack(side='left')
+    tk.Checkbutton(gif_tab, text='Invertir claros y oscuros', variable=gif_invert, bg=BG,
+                   fg=INK, selectcolor=CARD, activebackground=BG, activeforeground=INK).pack(anchor='w')
+    row = tk.Frame(gif_tab, bg=BG)
+    row.pack(fill='x', pady=8)
+    ttk.Combobox(row, textvariable=gif_region, values=['Dígitos', 'Cara circular'], state='readonly', width=15).pack(side='left')
+    ttk.Combobox(row, textvariable=gif_fit, values=['Ajustar completo', 'Llenar y recortar'], state='readonly', width=19).pack(side='left', padx=8)
+    gif_apply = button(gif_tab, 'Aplicar ajustes al GIF', lambda: convert_gif(ui['gif_path']) if ui['gif_path'] else None)
+    gif_apply.pack(anchor='w', pady=2)
+    row = tk.Frame(gif_tab, bg=BG)
+    row.pack(fill='x', pady=2)
+    label(row, 'Mostrar durante (s)', 10).pack(side='left', padx=(0, 10))
+    ttk.Spinbox(row, from_=2, to=60, textvariable=gif_seconds, width=6).pack(side='left')
+    row = tk.Frame(gif_tab, bg=BG)
+    row.pack(fill='x', pady=8)
+    gif_preview = button(row, 'Vista previa', play_gif)
+    gif_preview.pack(side='left')
+    gif_show = button(row, 'Mostrar en pantalla', lambda: play_gif(True), True)
+    gif_show.pack(side='left', padx=8)
+    button(row, 'Volver a CPU', lambda: select('sensors')).pack(side='left')
+    row.pack_configure(pady=3)
+    label(gif_tab, 'Hasta 20 MB y 60 s · adaptación a 10 cuadros/s · no conserva colores.\n'
+          'El GIF cargado y sus ajustes se usan en esta sesión.', 9, MUTED, justify='left').pack(anchor='w', pady=6)
+    gif_controls = [gif_import, gif_demo_button, gif_apply, gif_preview, gif_show]
+    for control in (gif_apply, gif_preview, gif_show):
+        control.configure(state='disabled')
     label(cycle, 'Tu secuencia', 17).pack(anchor='w')
     label(cycle, 'Cada diseño se alterna con CPU y GPU. Puedes ordenar la lista.', 10, MUTED, wraplength=510).pack(anchor='w', pady=(6, 12))
     playlist = tk.Listbox(cycle, bg=CARD, fg=INK, selectbackground='#a85d2b', font=('Segoe UI', 11),
@@ -369,6 +466,7 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors'):
         next_open, last_write, previous_packet = 0, 0, None
         last_status, last_scene = None, None
         last_cpu = missing_temperature_packet(blob, 'cpu')
+        gif_animation, gif_live = None, False
         try:
             while not stop.is_set():
                 now = time.monotonic()
@@ -384,6 +482,9 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors'):
                         elif kind == 'profile':
                             player.profile = value
                             player.select(player.mode, now)
+                        elif kind == 'gif':
+                            gif_animation, player.gif_seconds, gif_live = value
+                            player.select('gif', now)
                 except queue.Empty:
                     pass
                 scene, elapsed, remaining = player.current(now)
@@ -391,7 +492,9 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors'):
                     last_cpu = numeric_packet(blob, code, latest)
                 except ValueError:
                     last_cpu = missing_temperature_packet(blob, 'cpu')
-                if scene == 'gpu':
+                if scene == 'gif' and gif_animation:
+                    packet = gif_animation.packet_at(elapsed)
+                elif scene == 'gpu':
                     try:
                         packet = numeric_packet(blob, code, latest, 'gpu')
                     except ValueError:
@@ -409,10 +512,15 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors'):
                     except Exception as exc:
                         events.put(('usb', 'USB sin conexión · '+str(exc)))
                         next_open = now+3
-                if writer and (packet != previous_packet or now-last_write >= 1):
+                usb_packet = last_cpu if scene == 'gif' and not gif_live else packet
+                if scene == 'gif' and not gif_live and not player.profile.logo:
+                    cleared = bytearray(usb_packet)
+                    cleared[2+LOGO_BIT//8] &= ~(1 << (LOGO_BIT%8))
+                    usb_packet = bytes(cleared)
+                if writer and (usb_packet != previous_packet or now-last_write >= 1):
                     try:
-                        writer.write(packet)
-                        previous_packet, last_write = packet, now
+                        writer.write(usb_packet)
+                        previous_packet, last_write = usb_packet, now
                     except Exception as exc:
                         writer.close()
                         writer = None
@@ -426,7 +534,7 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors'):
                     events.put(('log', 'Página: '+SCENE_LABELS.get(scene, {'sensors':'CPU', 'gpu':'GPU', 'blank':'Pantalla apagada', 'soulkiller_all':'SoulKilleR'}.get(scene, scene))))
                     last_scene = scene
                 events.put(('frame', packet, scene, player.paused_at is not None, remaining))
-                stop.wait(.2 if scene not in ('sensors', 'gpu') else .15)
+                stop.wait(.05 if scene == 'gif' else (.2 if scene not in ('sensors', 'gpu') else .15))
         except Exception as exc:
             events.put(('log', 'Error del controlador: '+str(exc)))
         finally:
@@ -461,10 +569,31 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors'):
                 elif event[0] == 'update_error':
                     update_state['busy'] = False
                     update_status.configure(text='No se pudo completar: '+event[1])
+                elif event[0] == 'gif_loaded':
+                    _, animation, path, autoplay = event
+                    ui.update(gif=animation, gif_path=path)
+                    gif_busy['value'] = False
+                    for control in gif_controls:
+                        control.configure(state='normal')
+                    ui['gif_thumbnail'] = tk.PhotoImage(data=animation.preview_png)
+                    gif_thumbnail.configure(image=ui['gif_thumbnail'], text='')
+                    gif_status.configure(text=f'{animation.name} · {animation.source_frames} cuadros originales · '
+                                         f'{animation.duration:g} s · adaptado a 10 cuadros/s.\n'
+                                         'Ajusta la conversión y pulsa Aplicar ajustes antes de reproducir.')
+                    record(f'GIF convertido: {animation.source_frames} cuadros → {len(animation.packets)} cuadros de segmentos')
+                    tabs.select(gif_tab)
+                    if autoplay:
+                        play_gif(autoplay == 'screen')
+                elif event[0] == 'gif_error':
+                    gif_busy['value'] = False
+                    gif_status.configure(text='No se pudo convertir: '+event[1])
+                    for control in gif_controls:
+                        control.configure(state='normal' if ui['gif'] or control in (gif_import, gif_demo_button) else 'disabled')
+                    record('Error GIF: '+event[1])
                 elif event[0] == 'frame':
                     _, packet, scene, paused, remaining = event
                     ui['last_packet'] = packet.hex()
-                    title = SCENE_LABELS.get(scene, {'sensors':'Datos de CPU', 'gpu':'Temperatura GPU', 'blank':'Pantalla apagada', 'soulkiller_all':'SoulKilleR · solo arriba'}.get(scene, scene))
+                    title = SCENE_LABELS.get(scene, {'gif':'GIF · segmentos', 'sensors':'Datos de CPU', 'gpu':'Temperatura GPU', 'blank':'Pantalla apagada', 'soulkiller_all':'SoulKilleR · solo arriba'}.get(scene, scene))
                     current.configure(text=title+(' · pausa' if paused else '')+(f' · {remaining:.0f} s' if remaining is not None else ''))
                     pause_button.configure(text='Reanudar' if paused else 'Pausar')
                     for items, mask in zip(polygons, read_masks(controller_blob, packet)):
@@ -508,6 +637,8 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors'):
     pump()
     if not preview and not smoke:
         root.after(3000, check_updates)
+    if gif_demo or smoke:
+        root.after(150, lambda: convert_gif(ASSETS/'demo-segmentos.gif', 'preview' if preview else 'screen'))
     if smoke:
         callback_errors = []
         def fail_callback(kind, value, traceback):
@@ -520,7 +651,7 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors'):
         root.after(800, lambda: tabs.select(cycle))
         root.after(1000, lambda: tabs.select(settings))
         root.after(1200, lambda: tabs.select(diagnosis))
-        root.after(1400, lambda: tabs.select(designs))
+        root.after(1400, lambda: (tabs.select(gif_tab), play_gif()))
         if screenshot:
             def capture():
                 from PIL import ImageGrab
@@ -535,6 +666,8 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors'):
         os.startfile(str(ui['installer_on_exit']))
     if smoke and callback_errors:
         raise RuntimeError('Error durante la prueba de interfaz: '+str(callback_errors[0]))
+    if smoke and not ui['gif']:
+        raise RuntimeError('La prueba de interfaz no pudo cargar el GIF de demostración')
 
 
 if __name__ == '__main__':
@@ -542,10 +675,11 @@ if __name__ == '__main__':
     parser.add_argument('--preview', action='store_true')
     parser.add_argument('--smoke-test', action='store_true')
     parser.add_argument('--screenshot')
+    parser.add_argument('--gif-demo', action='store_true', help='Mostrar el GIF de demostración durante 12 s y volver a CPU')
     parser.add_argument('--mode', choices=['sensors','gpu','cycle','blank','name']+list(SCENE_LABELS), default='sensors')
     args = parser.parse_args()
     try:
-        run(args.preview or args.smoke_test, args.smoke_test, args.screenshot, args.mode)
+        run(args.preview or args.smoke_test, args.smoke_test, args.screenshot, args.mode, args.gif_demo)
     except Exception as exc:
         messagebox.showerror('COUGAR Studio', str(exc))
         raise

@@ -6,6 +6,8 @@ of its owner; this project is an independent, unofficial application.
 - Python: PSF license; https://github.com/python/cpython . Python is included
   in the packaged application, so users do not install it separately.
 - Tcl/Tk: BSD-style licenses; https://github.com/tcltk . Used by Tkinter.
+- Pillow 12.2.0: MIT-CMU license; https://github.com/python-pillow/Pillow/tree/12.2.0 .
+  Included for local GIF decoding and luminance conversion; license in `licenses`.
 - PyInstaller: GPL with its bootloader exception; https://github.com/pyinstaller/pyinstaller .
 - LibreHardwareMonitor 0.9.6: MPL-2.0;
   https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/tree/v0.9.6 .

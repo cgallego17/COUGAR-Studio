@@ -66,9 +66,10 @@ class Player:
     def __init__(self, profile=None, now=0):
         self.profile = profile or Profile()
         self.mode, self.started, self.paused_at = 'cycle', now, None
+        self.gif_seconds = 12
 
     def select(self, mode, now):
-        if mode not in ('cycle', 'sensors', 'gpu', 'blank', 'name') and mode not in SCENE_LABELS:
+        if mode not in ('cycle', 'sensors', 'gpu', 'blank', 'name', 'gif') and mode not in SCENE_LABELS:
             raise ValueError('Modo desconocido')
         self.mode, self.started, self.paused_at = mode, now, None
 
@@ -92,10 +93,11 @@ class Player:
                     return scene, max(0, offset)*self.profile.speed, duration-max(0, offset)
                 offset -= duration
             return slots[0][0], 0, slots[0][1]
-        if self.mode in SCENE_LABELS:
-            if elapsed >= self.profile.scene_seconds:
+        if self.mode in SCENE_LABELS or self.mode == 'gif':
+            duration = self.gif_seconds if self.mode == 'gif' else self.profile.scene_seconds
+            if elapsed >= duration:
                 return 'sensors', 0, None
-            return self.mode, elapsed*self.profile.speed, self.profile.scene_seconds-elapsed
+            return self.mode, elapsed*self.profile.speed, duration-elapsed
         if self.mode == 'name':
             return 'soulkiller_all', elapsed*self.profile.speed, None
         return self.mode, 0, None

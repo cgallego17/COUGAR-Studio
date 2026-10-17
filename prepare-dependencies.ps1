@@ -12,6 +12,7 @@ foreach ($signedFile in @('.deps\PawnIO_setup.exe','.deps\innosetup-6.7.3.exe'))
 }
 Expand-Archive -LiteralPath '.deps\LibreHardwareMonitor.zip' -DestinationPath '.deps\lhm' -Force
 $licenseFiles = @{
+ 'Pillow-LICENSE.txt'='https://raw.githubusercontent.com/python-pillow/Pillow/12.2.0/LICENSE';
  'LibreHardwareMonitor-MPL-2.0.txt'='https://raw.githubusercontent.com/LibreHardwareMonitor/LibreHardwareMonitor/v0.9.6/LICENSE';
  'LibreHardwareMonitor-THIRD-PARTY-NOTICES.txt'='https://raw.githubusercontent.com/LibreHardwareMonitor/LibreHardwareMonitor/v0.9.6/THIRD-PARTY-NOTICES.txt';
  'PawnIO-GPL-2.0.txt'='https://raw.githubusercontent.com/namazso/PawnIO/2.2.0/COPYING';

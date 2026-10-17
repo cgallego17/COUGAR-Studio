@@ -29,7 +29,30 @@ comercial; Windows puede mostrar una confirmación de editor desconocido.
 - Actualizaciones verificadas con SHA-256 desde las versiones de este repositorio.
 - Diagnóstico exportable y reinicio del servicio de sensores desde la interfaz.
 
-La pantalla usa segmentos fijos; no puede cargar fotos, fuentes de píxeles ni
+## Importar un GIF
+
+En la pestaña **GIF**, pulsa **Importar GIF…** o **Cargar demo**. La aplicación
+proyecta el brillo de cada cuadro sobre las 70 barras de los diez dígitos,
+como una imagen distribuida sobre las luces de un teclado. Conserva el
+movimiento aproximado, con pérdida de colores y detalles; no transforma
+el panel en una pantalla de píxeles. La geometría se estima a partir de la foto.
+
+Usa **Vista previa** para comprobar la adaptación manteniendo CPU en el
+dispositivo. **Mostrar en pantalla** reproduce el GIF durante 2–60 segundos
+y vuelve automáticamente a CPU. **Volver a CPU** interrumpe la reproducción;
+la pausa y la velocidad general también se aplican al GIF.
+
+Puedes ajustar el umbral de luz, invertir claros y oscuros, proyectar sobre
+el área de dígitos o la cara circular, y ajustar la imagen completa o recortarla
+para llenar el área. Después de cambiar estos ajustes, pulsa **Aplicar ajustes
+al GIF**. Se carga un GIF a la vez para la sesión actual; no forma parte del ciclo
+guardado. Las siluetas grandes, claras y sobre negro producen mejores resultados.
+
+Límites: GIF de hasta 20 MB, 60 segundos, 4 megapíxeles, 4096 px por lado y 1200
+cuadros originales. El movimiento se muestrea a 10 cuadros/s. La conversión
+ocurre en el equipo y no sube el GIF a Internet.
+
+La pantalla usa segmentos fijos; no admite imágenes a resolución completa, fuentes de píxeles ni
 reemplazar la forma física del logo. COUGAR sí puede encenderse y apagarse.
 Se envían exclusivamente cuadros HID `03`; la aplicación no actualiza firmware
 ni controla bombas o ventiladores. La disponibilidad de cada sensor depende

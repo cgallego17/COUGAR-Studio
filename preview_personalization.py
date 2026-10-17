@@ -1,8 +1,6 @@
 """Create a vector preview of the offline seven-segment personalization sample."""
 from pathlib import Path
 from html import escape
-import sys
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from segment_glyphs import FONT
 
 ROOT = Path(__file__).resolve().parent
