@@ -1,0 +1,72 @@
+# COUGAR Studio
+
+Aplicación independiente para administrar la pantalla de segmentos del
+**COUGAR Poseidon Vistek ARGB**, USB **2C65:1000 / HWCX USB Display**.
+No es para el Vistek Pro con pantalla gráfica.
+
+## Instalar en Windows
+
+Descarga el archivo **COUGAR-Studio-Setup-…-x64.exe** de
+[la última versión](https://github.com/cgallego17/COUGAR-Studio/releases/latest).
+Ejecuta el instalador y abre COUGAR Studio desde el escritorio o Inicio.
+Al abrir muestra los datos de CPU; las animaciones se activan desde la interfaz.
+
+El instalador incluye Python, la aplicación, el servicio de sensores y el
+controlador oficial firmado PawnIO. No requiere instalar Python, configurar
+consolas ni descargar dependencias manualmente. Requiere Windows 10 2004 o
+posterior / Windows 11 de 64 bits y permisos de administrador para instalar.
+Si Windows solicita un reinicio para activar PawnIO, complétalo antes de usar
+las temperaturas. El instalador de COUGAR Studio todavía no tiene firma
+comercial; Windows puede mostrar una confirmación de editor desconocido.
+
+## Funciones
+
+- 23 diseños y vista previa de la distribución circular 3/4/3.
+- Temperaturas de CPU y GPU, consumo/carga y ventilador CPU cuando hay lectura.
+- Ciclo editable: añade diseños, cambia el orden y ajusta sus tiempos.
+- Pausa/reanuda, velocidad y control del logo COUGAR en las temperaturas.
+- Preferencias en `%LOCALAPPDATA%\COUGAR Studio`.
+- Actualizaciones verificadas con SHA-256 desde las versiones de este repositorio.
+- Diagnóstico exportable y reinicio del servicio de sensores desde la interfaz.
+
+La pantalla usa segmentos fijos; no puede cargar fotos, fuentes de píxeles ni
+reemplazar la forma física del logo. COUGAR sí puede encenderse y apagarse.
+Se envían exclusivamente cuadros HID `03`; la aplicación no actualiza firmware
+ni controla bombas o ventiladores. La disponibilidad de cada sensor depende
+del hardware; una lectura ausente se muestra con guiones o vacía.
+
+Mantén la aplicación abierta para actualizar la pantalla. Cerrar detiene las
+actualizaciones y puede dejar congelado el último cuadro numérico. La vuelta
+al modo automático original del dispositivo no está comprobada.
+
+## Actualizaciones y publicación
+
+La pestaña **Actualizar** comprueba la última GitHub Release al abrir la app.
+Permite descargar el instalador y comprobar su SHA-256 antes de abrirlo.
+La instalación se inicia con confirmación del usuario; no se ejecuta código
+automáticamente desde Internet.
+
+Cada push a `main` ejecuta `.github/workflows/release.yml`: valida el código,
+genera el ejecutable y el instalador, y publica una versión `0.1.N` con sus hashes
+y fuentes de terceros. Subir código sin generar una Release no ofrece una
+actualización a instalaciones existentes.
+
+## Desarrollo
+
+Para desarrollar se necesita Python 3.14, Git y Windows; el usuario final solo
+necesita el instalador. Las herramientas de compilación se preparan de forma
+automática y sus descargas se verifican.
+
+```powershell
+python -m pip install -r requirements-build.txt
+python cougar_studio.py --preview
+python -m unittest discover -s tests -v
+.\build-release.ps1 -AppVersion 0.1.0
+```
+
+La prueba `python cougar_studio.py --smoke-test` abre y recorre la interfaz en
+simulación: no accede a USB ni a sensores. Para leer sensores durante desarrollo
+puede usarse el servicio instalado; si RM-Hardware ya está presente, se utiliza
+como alternativa para las lecturas que falten.
+
+Código de la aplicación: MIT. Consulta [los avisos de terceros](THIRD-PARTY-NOTICES.md).

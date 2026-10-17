@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.deps/
+build/
+dist/
+release/
+sensors/bin/
+licenses/
+*.tmp
+cougar-studio.json
+/catalogo-animaciones-y-letras.html
+*.log
+.env*

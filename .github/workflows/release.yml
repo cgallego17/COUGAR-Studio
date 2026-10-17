@@ -1,0 +1,33 @@
+name: Windows installer and release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: windows-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.14'
+      - name: Install build tools
+        run: python -m pip install -r requirements-build.txt
+      - name: Build and test
+        shell: pwsh
+        run: |
+          $version = '0.1.${{ github.run_number }}'
+          "APP_VERSION=$version" >> $env:GITHUB_ENV
+          .\build-release.ps1 -AppVersion $version
+      - name: Publish installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $assets = Get-ChildItem release -File | ForEach-Object FullName
+          gh release create "v$env:APP_VERSION" @assets --target '${{ github.sha }}' --title "COUGAR Studio $env:APP_VERSION" --notes-file RELEASE_NOTES.md
