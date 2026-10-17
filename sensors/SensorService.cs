@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -102,14 +103,35 @@ public sealed class SensorService : ServiceBase
         if ((displayOwner != 0 && (DateTime.UtcNow >= displayDeadline || !ValidOwner(displayOwner))) ||
             (displayOwner == 0 && vendorStopped)) RestoreVendor();
     }
-    string DisplayCommand(string request) {
+    [DllImport("iphlpapi.dll", SetLastError = true)]
+    static extern uint GetExtendedUdpTable(IntPtr table, ref int size, bool order, int family, int tableClass, uint reserved);
+    static bool SocketOwnedBy(int pid, int port) {
+        int size = 0;
+        if (GetExtendedUdpTable(IntPtr.Zero, ref size, false, 2, 1, 0) != 122 || size < 4 || size > 16*1024*1024) return false;
+        IntPtr table = Marshal.AllocHGlobal(size);
+        try {
+            if (GetExtendedUdpTable(table, ref size, false, 2, 1, 0) != 0) return false;
+            int count = Marshal.ReadInt32(table), found = 0;
+            if (count < 0 || count > (size-4)/12) return false;
+            for (int row = 0; row < count; row++) {
+                int offset = 4+row*12, encodedPort = Marshal.ReadInt32(table, offset+4);
+                int localPort = ((encodedPort & 255) << 8) | ((encodedPort >> 8) & 255);
+                if (localPort != port) continue;
+                if (Marshal.ReadInt32(table, offset+8) != pid) return false;
+                found++;
+            }
+            return found > 0;
+        } finally { Marshal.FreeHGlobal(table); }
+    }
+    string DisplayCommand(string request, int clientPort) {
         var serializer = new JavaScriptSerializer();
         long sequence = 0;
         try {
             string[] parts = request.Split('|');
             int pid;
             if (parts.Length != 4 || !Int32.TryParse(parts[1], out pid) ||
-                !Int64.TryParse(parts[2], out sequence) || (parts[3] != "take" && parts[3] != "release") || !ValidOwner(pid))
+                !Int64.TryParse(parts[2], out sequence) || (parts[3] != "take" && parts[3] != "release") ||
+                !SocketOwnedBy(pid, clientPort) || !ValidOwner(pid))
                 throw new InvalidOperationException("Solicitud de pantalla no valida");
             if (displayOwner != 0 && displayOwner != pid) throw new InvalidOperationException("Pantalla ocupada por otra instancia");
             if (parts[3] == "release") {
@@ -144,7 +166,7 @@ public sealed class SensorService : ServiceBase
                 if (request == "COUGAR-STUDIO/1") {
                     lock (gate) reply = snapshot ?? "{\"error\":\"Sensores iniciando\"}";
                 } else if (request.StartsWith("COUGAR-DISPLAY/1|", StringComparison.Ordinal)) {
-                    reply = DisplayCommand(request);
+                    reply = DisplayCommand(request, peer.Port);
                 } else continue;
                 byte[] bytes = Encoding.UTF8.GetBytes(reply);
                 udp.Send(bytes, bytes.Length, peer);

@@ -13,6 +13,7 @@ class DisplayOwnership:
         self.socket = None
         if self.enabled and exchange is None:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
             self.socket.connect(('127.0.0.1', 8896))
             self.socket.settimeout(.25)
         self.exchange = exchange or self._exchange
