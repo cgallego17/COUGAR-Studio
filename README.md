@@ -52,15 +52,24 @@ Límites: GIF de hasta 20 MB, 60 segundos, 4 megapíxeles, 4096 px por lado y 12
 cuadros originales. El movimiento se muestrea a 10 cuadros/s. La conversión
 ocurre en el equipo y no sube el GIF a Internet.
 
+Cuando RM-Hardware está instalado, el servicio de COUGAR Studio lo pausa durante
+GIF, diseños y páginas personalizadas para evitar dos escritores USB simultáneos.
+Lo restaura al volver a CPU o cerrar la aplicación. El control necesita renovarse
+cada segundo y caduca tras cinco segundos sin comunicación. Solo se acepta al
+ejecutable instalado en la misma carpeta protegida del servicio; la vista previa
+no pausa RM-Hardware. No se cambia su tipo de inicio. Si ya estaba detenido,
+se conserva ese estado. Los sensores propios siguen activos durante las escenas.
+
 La pantalla usa segmentos fijos; no admite imágenes a resolución completa, fuentes de píxeles ni
 reemplazar la forma física del logo. COUGAR sí puede encenderse y apagarse.
 Se envían exclusivamente cuadros HID `03`; la aplicación no actualiza firmware
 ni controla bombas o ventiladores. La disponibilidad de cada sensor depende
 del hardware; una lectura ausente se muestra con guiones o vacía.
 
-Mantén la aplicación abierta para actualizar la pantalla. Cerrar detiene las
-actualizaciones y puede dejar congelado el último cuadro numérico. La vuelta
-al modo automático original del dispositivo no está comprobada.
+Mantén la aplicación abierta para actualizar la pantalla. Al cerrar se restaura
+RM-Hardware si COUGAR Studio lo había pausado. Sin el servicio original, pueden
+quedar congelados los últimos valores. No se afirma restaurar un modo autónomo
+del firmware: se recupera el servicio de Windows que envía los datos.
 
 ## Actualizaciones y publicación
 

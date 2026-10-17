@@ -25,6 +25,7 @@ from display_protocol import HidWriter, LOGO_BIT, numeric_packet, missing_temper
 from segment_scenes import DIGIT_LAYOUT, INTERNET_SCENES, CIRCULAR_SCENES, SCENE_LABELS, scene_packet, read_masks
 from preview_personalization import SEGMENTS
 from gif_segments import load_gif
+from display_ownership import DisplayOwnership
 
 ROOT = Path(sys.executable).parent if getattr(sys, 'frozen', False) else SOURCE
 ASSETS = Path(sys._MEIPASS) if getattr(sys, 'frozen', False) else SOURCE / 'assets'
@@ -459,6 +460,7 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors', gif_demo
 
     def controller():
         writer = None
+        ownership = DisplayOwnership(enabled=not preview)
         blob, code, _ = load()
         player = Player(profile, time.monotonic())
         player.select(initial, time.monotonic())
@@ -467,6 +469,7 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors', gif_demo
         last_status, last_scene = None, None
         last_cpu = missing_temperature_packet(blob, 'cpu')
         gif_animation, gif_live = None, False
+        last_clock, last_ownership = time.monotonic(), None
         try:
             while not stop.is_set():
                 now = time.monotonic()
@@ -488,6 +491,22 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors', gif_demo
                 except queue.Empty:
                     pass
                 scene, elapsed, remaining = player.current(now)
+                needs_display = scene != 'sensors' and not (scene == 'gif' and not gif_live)
+                exclusive_ready = ownership.request(needs_display)
+                if not exclusive_ready:
+                    # Wait for the service to stop the competing writer before
+                    # starting the scene clock. CPU remains visible meanwhile.
+                    delay = max(0, now-last_clock)
+                    player.started = min(now, player.started+delay)
+                    if player.paused_at is not None:
+                        player.paused_at += delay
+                    scene, elapsed, remaining = player.current(now)
+                ownership_state = ('Esperando control de pantalla · '+(ownership.error or 'pausando RM-Hardware')) if not exclusive_ready else ''
+                if ownership_state != last_ownership:
+                    events.put(('ownership', ownership_state))
+                    if needs_display and exclusive_ready and ownership.enabled:
+                        events.put(('log', 'Control exclusivo confirmado · RM-Hardware pausado durante la escena'))
+                    last_ownership = ownership_state
                 try:
                     last_cpu = numeric_packet(blob, code, latest)
                 except ValueError:
@@ -513,6 +532,8 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors', gif_demo
                         events.put(('usb', 'USB sin conexión · '+str(exc)))
                         next_open = now+3
                 usb_packet = last_cpu if scene == 'gif' and not gif_live else packet
+                if not exclusive_ready:
+                    usb_packet = last_cpu
                 if scene == 'gif' and not gif_live and not player.profile.logo:
                     cleared = bytearray(usb_packet)
                     cleared[2+LOGO_BIT//8] &= ~(1 << (LOGO_BIT%8))
@@ -534,6 +555,7 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors', gif_demo
                     events.put(('log', 'Página: '+SCENE_LABELS.get(scene, {'sensors':'CPU', 'gpu':'GPU', 'blank':'Pantalla apagada', 'soulkiller_all':'SoulKilleR'}.get(scene, scene))))
                     last_scene = scene
                 events.put(('frame', packet, scene, player.paused_at is not None, remaining))
+                last_clock = now
                 stop.wait(.05 if scene == 'gif' else (.2 if scene not in ('sensors', 'gpu') else .15))
         except Exception as exc:
             events.put(('log', 'Error del controlador: '+str(exc)))
@@ -544,6 +566,7 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors', gif_demo
                 except Exception:
                     pass
                 writer.close()
+            ownership.close()
 
     def pump():
         try:
@@ -569,6 +592,10 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors', gif_demo
                 elif event[0] == 'update_error':
                     update_state['busy'] = False
                     update_status.configure(text='No se pudo completar: '+event[1])
+                elif event[0] == 'ownership':
+                    ui['ownership'] = event[1]
+                    if event[1]:
+                        record(event[1])
                 elif event[0] == 'gif_loaded':
                     _, animation, path, autoplay = event
                     ui.update(gif=animation, gif_path=path)
@@ -592,6 +619,9 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors', gif_demo
                     record('Error GIF: '+event[1])
                 elif event[0] == 'frame':
                     _, packet, scene, paused, remaining = event
+                    if ui.get('scene') == 'gif' and scene == 'sensors':
+                        gif_status.configure(text='Reproducción terminada. El dispositivo muestra los datos de CPU.')
+                    ui['scene'] = scene
                     ui['last_packet'] = packet.hex()
                     title = SCENE_LABELS.get(scene, {'gif':'GIF · segmentos', 'sensors':'Datos de CPU', 'gpu':'Temperatura GPU', 'blank':'Pantalla apagada', 'soulkiller_all':'SoulKilleR · solo arriba'}.get(scene, scene))
                     current.configure(text=title+(' · pausa' if paused else '')+(f' · {remaining:.0f} s' if remaining is not None else ''))
@@ -605,7 +635,7 @@ def run(preview=False, smoke=False, screenshot=None, initial='sensors', gif_demo
                     for item, bit in [(decimal, 115), (power_dot, 15)]:
                         canvas.itemconfigure(item, state='normal' if packet[2+bit//8] & (1 << (bit%8)) else 'hidden')
                 missing = ui['values'][0] is None or ui['values'][4] is None
-                transport.configure(text=ui['usb']+'\n'+('Sensores no disponibles · consulta Diagnóstico' if missing else 'Sensores CPU y GPU actualizados'))
+                transport.configure(text=ui['usb']+'\n'+(ui.get('ownership') or ('Sensores no disponibles · consulta Diagnóstico' if missing else 'Sensores CPU y GPU actualizados')))
         except queue.Empty:
             pass
         if not ui['closing']:

@@ -1,4 +1,11 @@
-GIF adaptado a los segmentos del COUGAR Poseidon Vistek ARGB.
+Corrige GIF y animaciones que seguían mostrando números en el dispositivo.
+
+- RM-Hardware sobrescribía el GIF cada medio segundo: ahora se pausa durante las escenas.
+- La animación espera la confirmación del control de pantalla antes de iniciar su tiempo.
+- RM-Hardware se restaura al volver a CPU, cerrar la aplicación o perder la comunicación.
+- Se conserva su tipo de inicio y no se inicia si ya estaba detenido antes de la prueba.
+- La vista previa mantiene CPU y no pausa el servicio original.
+- El estado de reproducción indica cuándo terminó el GIF.
 
 - Nueva pestaña GIF: importar animaciones o cargar una demo incluida.
 - Proyección de brillo sobre las 70 barras, como una imagen sobre luces de teclado.
