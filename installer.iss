@@ -22,6 +22,7 @@ WizardStyle=modern
 DisableProgramGroupPage=yes
 DisableDirPage=yes
 LicenseFile=LICENSE
+SetupIconFile=assets\studio.ico
 UninstallDisplayIcon={app}\COUGAR Studio.exe
 CloseApplications=yes
 RestartApplications=no

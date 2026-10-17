@@ -32,8 +32,11 @@ BG, CARD, INK, MUTED, ACCENT = '#10141b', '#1c2430', '#f4f6fa', '#a4b2c5', '#ff9
 
 
 def run(preview=False, smoke=False, screenshot=None, initial='sensors'):
+    if sys.platform == 'win32':
+        c.windll.shell32.SetCurrentProcessExplicitAppUserModelID('cgallego17.COUGARStudio')
     root = tk.Tk()
     root.title('COUGAR Studio')
+    root.iconbitmap(default=str(ASSETS / 'studio.ico'))
     root.geometry('1120x780')
     root.minsize(1060, 760)
     root.configure(bg=BG)

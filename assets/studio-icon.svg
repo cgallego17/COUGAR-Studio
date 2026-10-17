@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>COUGAR Studio — pantalla circular y S de segmentos</title>
+  <rect x="8" y="8" width="496" height="496" rx="112" fill="#10141b"/>
+  <circle cx="256" cy="256" r="181" fill="#1c2430" stroke="#ff9652" stroke-width="28"/>
+  <g fill="#f4f6fa">
+    <path d="M202 140H310L326 156L310 172H202L186 156Z"/>
+    <path d="M182 164L198 180V224L182 240L166 224V180Z"/>
+    <path d="M202 232H310L326 248L310 264H202L186 248Z"/>
+    <path d="M330 256L346 272V316L330 332L314 316V272Z"/>
+    <path d="M202 324H310L326 340L310 356H202L186 340Z"/>
+  </g>
+  <circle cx="376" cy="391" r="35" fill="#10141b"/>
+  <circle cx="376" cy="391" r="21" fill="#ff9652"/>
+</svg>

@@ -8,3 +8,8 @@ Aplicación de Windows para la pantalla COUGAR Poseidon Vistek ARGB de segmentos
 
 Proyecto independiente, sin afiliación oficial con COUGAR. Compatible con el
 dispositivo probado 2C65:1000; no con la pantalla gráfica del Vistek Pro.
+# Icono de COUGAR Studio
+
+Nuevo icono con pantalla circular naranja y una S de segmentos. Se aplica al
+ejecutable, ventana, barra de tareas, instalador y accesos directos de Windows.
+
